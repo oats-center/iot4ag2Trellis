@@ -25,31 +25,31 @@ Here is an example of how to get soil temperature for a particular day via the T
 `GET /bookmarks/iot4ag/soil/temperature/day-index/2024-02-24`
 ```json
 {
-	"data": {
-		"2024-02-24T05:00:15.709Z-a84041fe3187bc8e": {
-			"time": "2024-02-24T05:00:15.709Z",
-			"deviceid": "a84041fe3187bc8e",
-			"depth": {
-				"value": 2,
-				"units": "cm"
-			},
-			"temperature": {
-				"value": 21.91,
-				"units": "C"
-			}
-		},
-		"2024-02-24T05:02:10.017Z-a84041703187bc93": {
-			"time": "2024-02-24T05:02:10.017Z",
-			"deviceid": "a84041703187bc93",
-			"depth": {
-				"value": 2,
-				"units": "cm"
-			},
-			"temperature": {
-				"value": 0,
-				"units": "C"
-			}
-		}
+  "data": {
+    "2024-02-24T05:00:15.709Z-a84041fe3187bc8e": {
+      "time": "2024-02-24T05:00:15.709Z",
+      "deviceid": "a84041fe3187bc8e",
+      "depth": {
+        "value": 2,
+        "units": "cm"
+      },
+      "temperature": {
+        "value": 21.91,
+        "units": "C"
+      }
+    },
+    "2024-02-24T05:02:10.017Z-a84041703187bc93": {
+      "time": "2024-02-24T05:02:10.017Z",
+      "deviceid": "a84041703187bc93",
+      "depth": {
+        "value": 2,
+        "units": "cm"
+      },
+      "temperature": {
+        "value": 0,
+        "units": "C"
+      }
+    }
     }
 }
 ```
