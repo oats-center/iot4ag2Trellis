@@ -19,8 +19,8 @@ dotenv.config();
 const info = debug('iot4ag2adc/index:info');
 const error = debug('iot4ag2adc/index:error');
 
-const domain = "http://localhost:50599"; //process.env.OADA_DOMAIN;
-const token = "god"; //process.env.OADA_TOKEN;
+const domain = process.env.OADA_DOMAIN;
+const token = process.env.OADA_TOKEN;
 if (!domain) throw new Error('ERROR: you must have OADA_DOMAIN in the environment');
 if (!token) throw new Error('ERROR: you must have OADA_TOKEN in the environment');
 

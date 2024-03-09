@@ -1,0 +1,9 @@
+services:
+
+  iot4ag2trellis:
+    image: node:21-alpine
+    restart: 'unless-stopped'
+    volumes: 
+      - .:/code
+    working_dir: /code
+    command: /code/entrypoint.sh

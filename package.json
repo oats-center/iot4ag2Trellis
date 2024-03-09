@@ -4,8 +4,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsc -b -w",
-    "startop": "op run --env-file /Users/aultac/.config/op/iot4ag_pg -- nodemon --inspect -w dist dist/index.js",
+    "startop": "op run --env-file ./env -- nodemon --inspect -w dist dist/index.js",
     "start": "nodemon -w dist dist/index.js",
+    "startprod": "NODE_ENV=\"production\" node dist/index.js",
     "build": "yarn types && tsc -b",
     "build-types": "yarn node dist/build/build-types.js"
   },
