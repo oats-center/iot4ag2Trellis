@@ -6,7 +6,7 @@
     "dev": "tsc -b -w",
     "startop": "op run --env-file ./env -- nodemon --inspect -w dist dist/index.js",
     "start": "nodemon -w dist dist/index.js",
-    "startprod": "node dist/index.js",
+    "startprod": "env-cmd node dist/index.js",
     "build": "tsc -b",
     "build-types": "yarn node dist/build/build-types.js"
   },
@@ -19,6 +19,7 @@
     "dayjs": "^1.11.10",
     "debug": "^4.3.4",
     "dotenv": "^16.4.3",
+    "env-cmd": "^10.1.0",
     "glob": "^10.3.10",
     "json-schema-to-typescript": "^13.1.2",
     "jsonschema8": "^2.0.0",
