@@ -56,6 +56,10 @@ GET /bookmarks/iot4ag/soil/temperature/day-index/2024-02-24
 }
 ```
 
+## Service info
+---------------
+This service maintains its operating info in Trellis at `/bookmarks/services/iot4ag2Trellis`.
+You can update the polling interval and last poll times there as needed.
 
 ## Environment
 --------------
