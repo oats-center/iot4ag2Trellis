@@ -1,4 +1,32 @@
 {
   "name": "iot4ag2Trellis",
-  "packageManager": "yarn@4.1.0"
+  "packageManager": "yarn@4.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsc -b -w",
+    "startop": "op run --env-file /Users/aultac/.config/op/iot4ag_pg -- nodemon --inspect -w dist dist/index.js",
+    "start": "nodemon -w dist dist/index.js",
+    "build": "yarn types && tsc -b",
+    "build-types": "yarn node dist/build/build-types.js"
+  },
+  "dependencies": {
+    "@oada/client": "^5.0.0",
+    "@types/atomic-sleep": "^1.0.1",
+    "@types/pg": "^8.11.0",
+    "ajv": "^8.12.0",
+    "atomic-sleep": "^1.0.0",
+    "dayjs": "^1.11.10",
+    "debug": "^4.3.4",
+    "dotenv": "^16.4.3",
+    "glob": "^10.3.10",
+    "json-schema-to-typescript": "^13.1.2",
+    "jsonschema8": "^2.0.0",
+    "p-map": "^7.0.1",
+    "pg": "^8.11.3",
+    "typescript": "^5.3.3"
+  },
+  "devDependencies": {
+    "@types/debug": "^4",
+    "nodemon": "^3.0.3"
+  }
 }
