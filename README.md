@@ -22,7 +22,9 @@ Tree specifying the API: [tree](src/tree.ts)
 As can be seen in the tree, data is indexed by day for each data type.
 
 Here is an example of how to get soil temperature for a particular day via the Trellis API:
-`GET /bookmarks/iot4ag/soil/temperature/day-index/2024-02-24`
+```
+GET /bookmarks/iot4ag/soil/temperature/day-index/2024-02-24
+```
 ```json
 {
   "data": {
