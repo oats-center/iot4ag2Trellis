@@ -50,7 +50,7 @@ Here is an example of how to get soil temperature for a particular day via the T
         "units": "C"
       }
     }
-    }
+  }
 }
 ```
 
