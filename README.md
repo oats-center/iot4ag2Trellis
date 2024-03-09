@@ -15,9 +15,9 @@ docker-compose up -d
 --------------
 Tree specifying the API: [tree](src/tree.ts)
 
-[Soil Volumetric Water Content](./src/schema-WaterContent.ts)
-[Soil Temperature](./src/schema-WaterContent.ts)
-[Soil Conductivity](./src/schema-WaterContent.ts)
+* [Soil Volumetric Water Content](./src/schema-WaterContent.ts)
+* [Soil Temperature](./src/schema-WaterContent.ts)
+* [Soil Conductivity](./src/schema-WaterContent.ts)
 
 As can be seen in the tree, data is indexed by day for each data type.
 
