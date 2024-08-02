@@ -1,10 +1,11 @@
 {
   "name": "iot4ag2Trellis",
+  "version": "1.0.1",
   "packageManager": "yarn@4.1.0",
   "type": "module",
   "scripts": {
     "dev": "tsc -b -w",
-    "startop": "op run --env-file ./env -- nodemon --inspect -w dist dist/index.js",
+    "startop": "op run --env-file .env -- nodemon --inspect -w dist dist/index.js",
     "start": "nodemon -w dist dist/index.js",
     "startprod": "env-cmd node dist/index.js",
     "build": "tsc -b",

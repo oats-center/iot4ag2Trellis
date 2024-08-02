@@ -11,27 +11,13 @@ export const schema: JSONSchema8 = {
 
     tables: {
       type: 'object',
-      properties: {
-
-
-        cs_6layer: {
-          type: 'object',
-          properties: {
-            lastpoll_rowtime: { type: 'string' },
-          },
-          required: [ 'lastpoll_rowtime' ],
+      additionalProperties: {
+        type: 'object',
+        properties: {
+          lastpoll_rowtime: { type: 'string' },
         },
-
-        cs_surface: {
-          type: 'object',
-          properties: {
-            lastpoll_rowtime: { type: 'string' },
-          },
-          required: [ 'lastpoll_rowtime' ],
-        },
-
-      },
-      required: [ 'cs_6layer', 'cs_surface' ],
+        required: [ 'lastpoll_rowtime' ],
+      }, 
     },
   },
   required: [ 'tables', 'pollInterval' ],

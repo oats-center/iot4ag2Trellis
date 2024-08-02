@@ -96,15 +96,10 @@ export interface Service {
    */
   pollInterval: number;
   tables: {
-    cs_6layer: {
+    [k: string]: {
       lastpoll_rowtime: string;
       [k: string]: unknown;
     };
-    cs_surface: {
-      lastpoll_rowtime: string;
-      [k: string]: unknown;
-    };
-    [k: string]: unknown;
   };
   [k: string]: unknown;
 }

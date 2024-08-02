@@ -9,6 +9,8 @@ import type { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import tree from './tree.js';
 import { getServiceInfo } from './service.js';
+import { getTableConfigs } from './pgsetup.js';
+import type {  TableConfig } from './pgsetup.js';
 import type { Conductivity, Temperature, WaterContent, Service } from './builtTypes.js';
 
 //--------------------------------------------------
@@ -24,10 +26,10 @@ const token = process.env.OADA_TOKEN;
 if (!domain) throw new Error('ERROR: you must have OADA_DOMAIN in the environment');
 if (!token) throw new Error('ERROR: you must have OADA_TOKEN in the environment');
 
-type DayIndex<T> = {
+export type DayIndex<T> = {
   [day: string]: T,
 };
-type PollResultData = {
+export type PollResultData = {
   vwc: DayIndex<WaterContent>,
   temp: DayIndex<Temperature>,
   cond: DayIndex<Conductivity>,
@@ -37,7 +39,7 @@ type PollResultData = {
 // Connections:
 //------------------------------------------------- 
 const oada = await connect({ domain, token, concurrency: 1 });
-info('Connected to OADA at',domain);
+info('Connected to OADA at',domain, 'with token', token);
 
 //------------------------------------------------ 
 // Actual poll function:
@@ -47,17 +49,23 @@ async function poll() {
   info('----------------------------------------------');
   info('Starting poll run at', dayjs().toISOString())
   try {
-    const service = await getServiceInfo(oada);
-    pollInterval = service.pollInterval || pollInterval;
     const result: PollResultData = { vwc: {}, temp: {}, cond: {} };
+    // Get the tables we need to poll in PG and wire up to the result buckets:
+    const tableConfigs = getTableConfigs(result);
 
+    // Grab the latest service info:
+    const service = await getServiceInfo({tableConfigs, oada});
+    pollInterval = service.pollInterval || pollInterval;
     //------------------------------------------------ 
     // Poll each table
     //------------------------------------------------ 
-    const reallyold = dayjs('1970-01-01');
-    const maxtime_cs_6layer = await pollOneTable({ table: 'cs_6layer', result, service }) || reallyold;
-    const maxtime_cs_surface = await pollOneTable({ table: 'cs_surface', result, service }) || reallyold;
-    // vwc, temp, and cond are filled out now
+    const maxtimes: {tablename: string, maxtime: Dayjs}[] = [];
+    for (const tableinfo of tableConfigs) {
+      const maxtime = await pollOneTable({ tableinfo, result, service }) || dayjs('1970-01-01');
+      maxtimes.push({ tablename: tableinfo.table, maxtime });
+    }
+
+    // vwc, temp, and cond are filled out now from postgres
 
 
     //---------------------------------------------------------- 
@@ -86,23 +94,17 @@ async function poll() {
       info('FAIL: failed to put data to Trellis.  Error was: ', e);
       throw new Error('Failed to put data to Trellis');
     }
-
     //---------------------------------------------------------- 
     // Update poll times for our service if everything worked
     //----------------------------------------------------------  
     const tables: Json = { };
-    if (maxtime_cs_6layer) {
-      const str = service.tables.cs_6layer.lastpoll_rowtime;
-      const s_maxtime = str ? dayjs(str) : reallyold;
-      if (s_maxtime.isBefore(maxtime_cs_6layer)) {
-        tables['cs_6layer'] = { lastpoll_rowtime: maxtime_cs_6layer.toISOString() };
-      }
-    }
-    if (maxtime_cs_surface) {
-      const str = service.tables.cs_surface.lastpoll_rowtime;
-      const s_maxtime = str ? dayjs(str) : reallyold;
-      if (s_maxtime.isBefore(maxtime_cs_surface)) {
-        tables['cs_surface'] = { lastpoll_rowtime: maxtime_cs_surface.toISOString() };
+    for (const tableinfo of tableConfigs) {
+      const maxtime = maxtimes.find(m => m.tablename === tableinfo.table)?.maxtime;
+      if (!maxtime) throw new Error('ERROR: maxtime not found for table '+tableinfo.table);
+      const str = service.tables[tableinfo.table]?.lastpoll_rowtime;
+      const s_maxtime = str ? dayjs(str) : dayjs('1970-01-01');
+      if (s_maxtime.isBefore(maxtime)) { // this poll had a newer row than last time, so update Trellis for it:
+        tables[tableinfo.table] = { lastpoll_rowtime: maxtime.toISOString() };
       }
     }
     if (Object.keys(tables).length > 0) {
@@ -121,14 +123,28 @@ async function poll() {
 //------------------------------------------------- 
 // Poll one table
 //------------------------------------------------- 
-async function pollOneTable({table, result, service}: {
-  table: 'cs_6layer' | 'cs_surface',
+async function pollOneTable({tableinfo, result, service}: {
+  tableinfo: TableConfig,
   result: PollResultData,
   service: Service,
 }): Promise<Dayjs | null> { // returns maxpolltime from the rows
   let pgclient: pg.Client;
   try {
-    pgclient = new pg.Client();
+    const connectinfo = {
+      user: process.env.PGUSER,
+      password: process.env.PGPASSWORD,
+      host: process.env.PGHOST,
+      port: +(process.env.PGPORT || 5431),
+      database: process.env.PGDATABASE,
+    };
+    if (tableinfo.db === 'old') {
+      connectinfo.user = process.env.OLDPGUSER;
+      connectinfo.password = process.env.OLDPGPASSWORD;
+      connectinfo.host = process.env.OLDPGHOST;
+      connectinfo.port = +(process.env.OLDPGPORT || 5431);
+      connectinfo.database = process.env.OLDPGDATABASE;
+    }
+    pgclient = new pg.Client(connectinfo);
     await pgclient.connect();
   } catch(e: any) {
     error('ERROR: failed to connect to Postgres.  Error was: ', e);
@@ -140,24 +156,24 @@ async function pollOneTable({table, result, service}: {
     //---------------------------------------------------- 
     // Construct query
     //---------------------------------------------------- 
-    const tinfo = service.tables[table] as object;
-    const lastpoll_rowtime = tinfo && 'lastpoll_rowtime' in tinfo ? tinfo.lastpoll_rowtime : '';
-    q = `SELECT * FROM ${table}`;
+    const svc_tinfo = service.tables[tableinfo.table] as object;
+    const lastpoll_rowtime = svc_tinfo && 'lastpoll_rowtime' in svc_tinfo ? svc_tinfo.lastpoll_rowtime : '';
+    q = `SELECT * FROM ${tableinfo.table}`;
     if (lastpoll_rowtime) {
-      q += ` WHERE time > '${lastpoll_rowtime}'`;
+      q += ` WHERE ${tableinfo.timeColumn} > '${lastpoll_rowtime}'`;
     }
-    q += ' ORDER BY time ASC LIMIT 1000';
+    q += ` ORDER BY ${tableinfo.timeColumn} ASC LIMIT 1000`;
     const resp = await pgclient.query(q);
     if (!resp.rows || resp.rows.length < 1) {
-      info('No new rows found for', table);
+      info('No new rows found for', tableinfo.table);
       return null;
     }
-    info('Found',resp.rows.length,'new rows in',table);
+    info('Found',resp.rows.length,'new rows in',tableinfo.table);
     
     //---------------------------------------------------- 
     // Map postgres result into Trellis, return max poll times from rows
     //---------------------------------------------------- 
-    return rowsToPollResultData({ table, rows: resp.rows, result });
+    return rowsToPollResultData({ tableinfo, rows: resp.rows, result });
 
   } catch(err: any) {
     if (err.request) delete err.request; // print things cleaner
@@ -166,7 +182,6 @@ async function pollOneTable({table, result, service}: {
   } finally {
     await pgclient.end();
   }
-
 }
 
 
@@ -175,33 +190,17 @@ async function pollOneTable({table, result, service}: {
 //--------------------------------------------------- 
 
 function rowsToPollResultData(
-  {table, rows, result}: 
-  { table: string, rows: any[], result: PollResultData }
+  {tableinfo, rows, result}: 
+  {tableinfo: TableConfig, rows: any[], result: PollResultData }
 ): Dayjs | null { // Returns max time from all the rows
   const { vwc, temp, cond } = result;
-  const pg2TrellisMap = {
-    'vwc'  : { depth:   2, key: 'vwc', units: '%', bucket: vwc },
-    'vwc_1': { depth:   2, key: 'vwc', units: '%', bucket: vwc },
-    'vwc_2': { depth:  20, key: 'vwc', units: '%', bucket: vwc },
-    'vwc_3': { depth:  40, key: 'vwc', units: '%', bucket: vwc },
-    'vwc_4': { depth:  60, key: 'vwc', units: '%', bucket: vwc },
-    'vwc_5': { depth:  80, key: 'vwc', units: '%', bucket: vwc },
-    'vwc_6': { depth: 100, key: 'vwc', units: '%', bucket: vwc },
-    'temp_c'  : { depth:   2, key: 'temperature', units: 'C', bucket: temp },
-    'temp_c_1': { depth:   2, key: 'temperature', units: 'C', bucket: temp },
-    'temp_c_2': { depth:  20, key: 'temperature', units: 'C', bucket: temp },
-    'temp_c_3': { depth:  40, key: 'temperature', units: 'C', bucket: temp },
-    'temp_c_4': { depth:  60, key: 'temperature', units: 'C', bucket: temp },
-    'temp_c_5': { depth:  80, key: 'temperature', units: 'C', bucket: temp },
-    'temp_c_6': { depth: 100, key: 'temperature', units: 'C', bucket: temp },
-    'conduct_us_cm': { depth: 2, key: 'conductivity', units: 'uS/cm', bucket: cond },
-  };
   let maxtime: Dayjs | null = null;
   for (const [rownum, r] of rows.entries()) {
     if (!r) throw new Error('Row '+rownum+' failed: row is falsey')
 
-    if (!(r.time instanceof Date)) throw new Error('Row '+rownum+' failed: time ('+(JSON.stringify(r.time))+') is not a Date');
-    const date = dayjs(r.time);
+    const ts = r[tableinfo.timeColumn];
+    if (!(ts instanceof Date)) throw new Error('Row '+rownum+' failed: time or ts ('+(JSON.stringify(ts))+') is not a Date');
+    const date = dayjs(ts);
     if (!date || !date.isValid()) throw new Error('Row '+rownum+' failed: dayjs(time) is not valid');
     if (date.year() < 2020) {
       info('Skipping data with very old date: ', date.toISOString());
@@ -212,21 +211,26 @@ function rowsToPollResultData(
     if (!maxtime) maxtime = date;
     if (maxtime.isBefore(date)) maxtime = date;
 
-    if (typeof r.device_eui !==  'string') throw new Error('Row '+rownum+' failed: device_euid is not a string');
-    const deviceid = r.device_eui;
+    const deviceid = r[tableinfo.deviceidColumn];
+    if (typeof deviceid !==  'string') throw new Error('Row '+rownum+' failed: device_euid or device_id is not a string');
 
     // a repeatable, unique id for this sample
     const sampleid = time+'-'+deviceid;
 
     const base = { time, deviceid };
 
-    for (const [dbkey, info] of Object.entries(pg2TrellisMap)) {
+    for (const [dbkey, info] of Object.entries(tableinfo.dataColumns)) {
       if (typeof r[dbkey] === 'number')  {
         if (!info.bucket[day]) info.bucket[day] = { data: {} };
+        let depthvalue = +(r[tableinfo.depthColumn || ''] || 0);
+        if (info.depth) { // can override from column info with a constant if no depth column exists in DB (old DB style)
+          depthvalue = info.depth;
+        }
+        if (typeof depthvalue !== 'number') throw new Error('Row '+rownum+' failed: either no depth column exists or depth in column info is not a number');
         // @ts-ignore
         info.bucket[day].data[sampleid] = { 
           ...base,
-          depth: { value: info.depth, units: 'cm' }, // cs_surface is only table with conductivity
+          depth: { value: depthvalue, units: 'cm' }, // cs_surface is only table with conductivity
           [info.key]: { 
             value: r[dbkey],
             units: info.units,

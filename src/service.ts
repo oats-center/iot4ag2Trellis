@@ -3,19 +3,20 @@ import type { Service } from './builtTypes.js';
 import { assertService } from './builtTypes.js';
 import type { OADAClient, JsonObject } from '@oada/client';
 import tree from './tree.js';
+import type { TableConfig } from './pgsetup.js';
 
 const info = debug('iot4ag2adc/service:info');
 const error = debug('iot4ag2adc/service:error');
 
 const servicePath = '/bookmarks/services/iot4ag2Trellis';
-export async function getServiceInfo(oada: OADAClient): Promise<Service> {
+export async function getServiceInfo({tableConfigs, oada}: { tableConfigs: TableConfig[], oada: OADAClient }): Promise<Service> {
   // Grab service info from OADA (last poll times)
   const defaultServiceInfo: Service = {
     pollInterval: process.env.POLL_INTERVAL ? +(process.env.POLL_INTERVAL) : 1000,
-    tables: {
-      cs_6layer: { lastpoll_rowtime: '' },
-      cs_surface: { lastpoll_rowtime: '' }
-    }
+    tables: { },
+  };
+  for (const tableinfo of tableConfigs) {
+    defaultServiceInfo.tables[tableinfo.table] = { lastpoll_rowtime: '' };
   }
   try {
     const response = await oada.get({ path: servicePath });
