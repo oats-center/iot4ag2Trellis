@@ -73,3 +73,6 @@ will be overridden by any valid value in the service info in Trellis.
 * `POLL_INTERVAL_MS`
 * `OADA_DOMAIN`
 * `OADA_TOKEN`
+* `LASTREV_SYNCOVERRIDE=true`: this will prevent ADC from syncing any existing files until they change after 
+  this current import.  Set this to true when refreshing your local OADA to avoid unnecessary uploads.  New
+  files will still be uploaded to ADC even if this is set.

@@ -25,6 +25,7 @@ const domain = process.env.OADA_DOMAIN;
 const token = process.env.OADA_TOKEN;
 if (!domain) throw new Error('ERROR: you must have OADA_DOMAIN in the environment');
 if (!token) throw new Error('ERROR: you must have OADA_TOKEN in the environment');
+const lastrev_syncoverride_mode = process.env.LASTREV_SYNCOVERRIDE || null;
 
 export type DayIndex<T> = {
   [day: string]: T,
@@ -75,18 +76,15 @@ async function poll() {
     try { 
       await pmap(Object.entries(result.vwc), async ([day, data]) => {
         const path = '/bookmarks/iot4ag/soil/water-content/day-index/'+day;
-        info('Putting to '+path)
-        return oada.put({ tree, path, data: data as Json });
+        return putToOADA({ path, data: data as Json});
       }, { concurrency: 1 });
       await pmap(Object.entries(result.temp), async ([day, data]) => {
         const path = '/bookmarks/iot4ag/soil/temperature/day-index/'+day;
-        info('Putting to '+path)
-        return oada.put({ tree, path, data: data as Json });
+        return putToOADA({ path, data: data as Json });
       }, { concurrency: 1 });
       await pmap(Object.entries(result.cond), async ([day, data]) => {
         const path = '/bookmarks/iot4ag/soil/conductivity/day-index/'+day;
-        info('Putting to '+path)
-        return oada.put({ tree, path, data: data as Json });
+        return putToOADA({ path, data: data as Json });
       }, { concurrency: 1 });
       info('Successfully put a total of', numputs, 'days of data to Trellis from Postgres');
     } catch(e: any) {
@@ -241,6 +239,26 @@ function rowsToPollResultData(
   }
   return maxtime;
 }
+
+
+//------------------------------------------------
+// Put to OADA: wrapper to add support for lastrev_syncoverride_mode
+//-----------------------------------------------
+async function putToOADA({path, data}: {path: string, data: Json}): Promise<any> {
+  info('Putting to '+path)
+  const result = await oada.put({ tree, path, data: data as Json });
+  if (lastrev_syncoverride_mode) {
+    let rev = +(result.headers['x-oada-rev'] || 0);
+    const resourceidpath = result.headers['content-location'];
+    if (!rev) throw new Error('No x-oada-rev found in headers when putting to '+path);
+    if (!resourceidpath) throw new Error('No content-location found in headers when putting to '+path);
+    const metapath = resourceidpath + '/_meta';
+    rev++; // Note: the write to OADA for this _meta will increment the rev, so we have to put the incremented rev
+    //info('We are in lastrev_syncoverride_mode, so we going to put the latest rev '+rev+' back to '+metapath);
+    await oada.put({ path: metapath, data: { lastrev_syncoverride: rev } });
+  }
+}
+
 
 //------------------------------------------------ 
 // Do the polling, poll function will reschedule itself in "finally"
